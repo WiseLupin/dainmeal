@@ -1,0 +1,680 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Dain's 건강 이유식</title>
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: #FFFBF0;
+            color: #333;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .ingredient-tag {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 12px;
+            margin: 2px;
+            font-weight: 600;
+            font-size: 0.75rem;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+        }
+        .tag-beef { background-color: #FF6B6B; color: white; }
+        .tag-chicken { background-color: #FFD93D; color: #5C4033; }
+        .tag-fish { background-color: #4D96FF; color: white; }
+        .tag-pork { background-color: #E08282; color: white; }
+        .tag-veg-green { background-color: #6BCB77; color: white; }
+        .tag-veg-red { background-color: #FF8080; color: white; }
+        .tag-beet { background-color: #F06292; color: white; }
+        .tag-pumpkin { background-color: #FFA500; color: white; }
+        .tag-egg { background-color: #FFF59D; color: #5C4033; }
+        .tag-base { background-color: #F3E5F5; color: #7B1FA2; }
+        .tag-fruit { background-color: #E1F5FE; color: #0288D1; }
+        .tag-default { background-color: #E0E0E0; color: #666; }
+        .tab-active { border-bottom: 3px solid #FF8A8A; color: #FF8A8A; font-weight: bold; }
+        ::-webkit-scrollbar { display: none; }
+        input[type="date"]::-webkit-calendar-picker-indicator {
+            background: transparent; bottom: 0; color: transparent; cursor: pointer;
+            height: auto; left: 0; position: absolute; right: 0; top: 0; width: auto;
+        }
+        .search-suggestion {
+            position: absolute; width: 100%; max-height: 200px; overflow-y: auto;
+            background: white; border: 1px solid #eee; border-radius: 0 0 1rem 1rem;
+            z-index: 50; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+        }
+    </style>
+</head>
+<body class="antialiased">
+
+    <div id="app" class="max-w-md mx-auto min-h-screen bg-white shadow-xl flex flex-col border-x border-orange-50 pb-20">
+        <!-- Header -->
+        <header class="bg-orange-50 pt-10 pb-6 text-center">
+            <h1 class="text-3xl font-extrabold text-orange-400">Dain's 건강이유식</h1>
+            <p class="text-gray-400 text-sm mt-1">건강하게 쑥쑥 자라라 ✨</p>
+        </header>
+
+        <!-- Tabs -->
+        <nav class="flex border-b sticky top-0 bg-white z-10">
+            <button id="btn-menu" class="flex-1 py-4 text-center tab-active font-semibold" onclick="showTab('menu')">메뉴</button>
+            <button id="btn-search" class="flex-1 py-4 text-center text-gray-400 font-semibold" onclick="showTab('search')">검색</button>
+            <button id="btn-prep" class="flex-1 py-4 text-center text-gray-400 font-semibold" onclick="showTab('prep')">준비</button>
+            <button id="btn-db" class="flex-1 py-4 text-center text-gray-400 font-semibold" onclick="showTab('db')">관리</button>
+        </nav>
+
+        <div class="p-6 flex-1">
+            <!-- 탭 1: 메뉴 -->
+            <div id="tab-content-menu">
+                <div class="flex items-center justify-between mb-4 bg-gray-50 rounded-2xl p-2">
+                    <button onclick="moveDate(-1)" class="p-2 text-orange-400 font-bold text-xl active:scale-90 transition-transform">◀</button>
+                    <div class="text-center relative">
+                        <input type="date" id="date-selector" class="bg-transparent border-none font-bold text-lg text-center focus:ring-0 cursor-pointer">
+                        <div id="d-day-info" class="text-sm text-orange-500 font-bold"></div>
+                    </div>
+                    <button onclick="moveDate(1)" class="p-2 text-orange-400 font-bold text-xl active:scale-90 transition-transform">▶</button>
+                </div>
+                <div class="flex justify-center mb-6">
+                    <button onclick="goToToday()" class="px-4 py-1.5 bg-orange-100 text-orange-600 rounded-full text-xs font-bold shadow-sm active:scale-95 transition-transform">오늘</button>
+                </div>
+                <div id="meals-list" class="space-y-6"></div>
+                <!-- 메모 섹션 -->
+                <div class="mt-10 border-t pt-6">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="font-bold text-gray-700 flex items-center gap-1">🛒 메모 / 장바구니</h3>
+                        <button onclick="addMemoRow()" class="w-8 h-8 bg-orange-400 hover:bg-orange-500 text-white rounded-full flex items-center justify-center shadow-md active:scale-90 transition-transform font-bold text-lg">+</button>
+                    </div>
+                    <div id="memo-input-area" class="space-y-2 mb-3"></div>
+                    <ul id="memo-list" class="space-y-2"></ul>
+                </div>
+            </div>
+
+            <!-- 탭 2: 검색 -->
+            <div id="tab-content-search" class="hidden">
+                <div class="relative mb-6">
+                    <input type="text" id="search-input" oninput="handleSearchInput(this.value)" placeholder="식재료를 검색하세요 (예: 소고기)" class="w-full border-2 border-orange-100 rounded-2xl px-5 py-4 focus:outline-none focus:border-orange-300 shadow-sm">
+                    <div id="search-suggestions" class="search-suggestion hidden"></div>
+                </div>
+                <div id="search-results" class="space-y-4">
+                    <p class="text-center text-gray-400 py-10">궁금한 식재료가 언제 포함되어 있는지 검색해 보세요!</p>
+                </div>
+            </div>
+
+            <!-- 탭 3: 준비 -->
+            <div id="tab-content-prep" class="hidden">
+                <div class="text-center mb-4">
+                    <div class="flex items-center justify-between bg-blue-50 rounded-2xl p-2 mb-2">
+                        <button onclick="moveWeek(-1)" class="p-2 text-blue-400 font-bold text-xl active:scale-90 transition-transform">◀</button>
+                        <span id="week-range" class="font-bold text-blue-600"></span>
+                        <button onclick="moveWeek(1)" class="p-2 text-blue-400 font-bold text-xl active:scale-90 transition-transform">▶</button>
+                    </div>
+                    <button onclick="goToCurrentWeek()" class="px-4 py-1.5 bg-blue-100 text-blue-600 rounded-full text-xs font-bold shadow-sm active:scale-95 transition-transform">이번주</button>
+                </div>
+                <div class="mb-8">
+                    <h4 class="text-sm font-bold text-gray-500 mb-3">사용될 식재료 (클릭하여 담기)</h4>
+                    <div id="available-ingredients" class="flex flex-wrap gap-1"></div>
+                </div>
+                <div class="bg-gray-50 rounded-2xl p-4">
+                    <h4 class="text-sm font-bold text-blue-600 mb-3 underline">이번 주 장바구니</h4>
+                    <div id="shopping-list" class="space-y-2"></div>
+                </div>
+            </div>
+
+            <!-- 탭 4: 관리(DB) -->
+            <div id="tab-content-db" class="hidden">
+                <div class="mb-6 bg-orange-50 p-4 rounded-2xl border border-orange-100 space-y-4">
+                    <div>
+                        <h3 class="font-bold text-gray-700 text-sm mb-2">👶 아기 기준일(생일) 설정</h3>
+                        <input type="date" id="birth-date-setter" onchange="updateBirthDate(this.value)" class="w-full bg-white border border-orange-200 rounded-xl px-3 py-2 text-sm shadow-sm" style="text-align:left; display:block; box-sizing:border-box;">
+                    </div>
+                    <div class="border-t border-orange-200 pt-3">
+                        <h3 class="font-bold text-red-700 text-sm mb-1">🔄 데이터 완전 초기화</h3>
+                        <p class="text-xs text-gray-500 mb-3">식단 데이터의 변경 이력을 삭제하고 D+270 ~ D+359 오리지널 값으로 원복합니다.</p>
+                        <button onclick="resetDbToDefault()" class="px-4 py-2 bg-red-100 hover:bg-red-200 text-red-600 rounded-xl text-xs font-bold transition-all shadow-sm">기본 데이터로 리셋</button>
+                    </div>
+                </div>
+                <div id="db-editor-container" class="space-y-4"></div>
+                <div class="mt-8 mb-10">
+                    <button onclick="saveAllToDB()" class="w-full bg-orange-400 hover:bg-orange-500 text-white py-4 rounded-2xl font-bold shadow-lg transition-transform active:scale-[0.98]">전체 저장</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Custom Confirm Modal -->
+    <div id="confirm-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl transform transition-transform duration-200 scale-95">
+            <h3 id="confirm-title" class="text-lg font-bold text-gray-800 mb-2">확인</h3>
+            <p id="confirm-message" class="text-sm text-gray-500 mb-6"></p>
+            <div class="flex justify-end space-x-3">
+                <button id="confirm-cancel" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-xl text-sm font-semibold active:scale-95">취소</button>
+                <button id="confirm-ok" class="px-4 py-2 bg-red-400 hover:bg-red-500 text-white rounded-xl text-sm font-semibold active:scale-95">확인</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Custom Toast Container -->
+    <div id="toast-container" class="fixed bottom-24 left-1/2 transform -translate-x-1/2 z-50 pointer-events-none flex flex-col gap-2"></div>
+
+    <script>
+        let BIRTH_DATE = new Date('2025-08-07');
+        
+        // PDF 기반 D+270 ~ D+359 업데이트 전체 데이터
+        const pdfData = [
+            // 후기 1, 2단계 (D+270~299)
+            { startD: 270, endD: 272, morning: "베이스: 쌀차조무른밥 / 토핑: 소고기, 새송이, 연근, 배추", lunch: "베이스: 쌀오트밀 / 토핑: 당근, 브로콜리, 양파, 비트", dinner: "베이스: 잡곡무른밥 / 토핑: 달걀, 양배추, 브로콜리, 토마토" },
+            { startD: 273, endD: 275, morning: "베이스: 소고기미역죽 / 토핑: 양파, 당근", lunch: "베이스: 잡곡무른밥 / 토핑: 닭고기, 비타민, 양파, 토마토", dinner: "베이스: 잡곡무른밥 / 토핑: 두부, 양송이, 양파, 비트" },
+            { startD: 276, endD: 278, morning: "베이스: 쌀차조무른밥 / 토핑: 소고기, 검은콩, 청경채, 애호박", lunch: "베이스: 잡곡무른밥 / 토핑: 닭고기, 시금치, 양송이, 단호박", dinner: "베이스: 잡곡무른밥 / 토핑: 두부, 브로콜리, 당근, 양파" },
+            { startD: 279, endD: 281, morning: "베이스: 쌀구기자닭죽 / 토핑: 양파, 단호박", lunch: "베이스: 잡곡무른밥 / 토핑: 토마토, 양파, 배추, 비타민", dinner: "베이스: 잡곡무른밥 / 토핑: 소고기, 검은콩, 브로콜리, 당근" },
+            { startD: 282, endD: 284, morning: "베이스: 쌀구기자닭죽 / 토핑: 밤, 청경채", lunch: "베이스: 잡곡무른밥 / 토핑: 소고기, 연근, 비타민, 단호박", dinner: "베이스: 잡곡무른밥 / 토핑: 배추, 애호박, 당근, 브로콜리" },
+            { startD: 285, endD: 287, morning: "베이스: 잡곡무른밥 / 토핑: 소고기, 팽이버섯, 비트, 브로콜리", lunch: "베이스: 잡곡무른밥 / 토핑: 닭고기, 연근, 애호박, 배추", dinner: "베이스: 잡곡무른밥 / 토핑: 두부, 당근, 비타민, 감자" },
+            { startD: 288, endD: 290, morning: "베이스: 잡곡무른밥 / 토핑: 소고기, 근대, 양파, 당근", lunch: "베이스: 잡곡무른밥 / 토핑: 닭고기, 밤, 비타민, 단호박", dinner: "베이스: 잡곡무른밥 / 토핑: 달걀, 팽이버섯, 시금치, 애호박" },
+            { startD: 291, endD: 293, morning: "베이스: 잡곡무른밥 / 토핑: 소고기, 파프리카, 비타민, 양배추", lunch: "베이스: 잡곡무른밥 / 토핑: 닭고기, 밤, 양파, 브로콜리", dinner: "베이스: 잡곡무른밥 / 토핑: 생선, 토마토, 적채, 단호박" },
+            { startD: 294, endD: 296, morning: "베이스: 잡곡무른밥 / 토핑: 소고기, 김, 당근, 애호박", lunch: "베이스: 잡곡무른밥 / 토핑: 닭고기, 팽이버섯, 양파, 단호박", dinner: "베이스: 잡곡무른밥 / 토핑: 두부, 연근, 비타민, 브로콜리" },
+            { startD: 297, endD: 299, morning: "베이스: 잡곡무른밥 / 토핑: 소고기, 가지, 청경채, 당근", lunch: "베이스: 잡곡무른밥 / 토핑: 닭고기, 파프리카, 브로콜리, 치즈", dinner: "베이스: 잡곡무른밥 / 토핑: 달걀, 시금치, 토마토, 당근" },
+            
+            // 후기 2.5단계 (D+300~329)
+            { startD: 300, endD: 302, morning: "베이스: 잡곡진밥 / 토핑: 닭고기, 아스파라거스, 치즈감자", lunch: "베이스: 잡곡진밥 / 토핑: 김, 당근, 양파, 브로콜리", dinner: "베이스: 잡곡진밥 / 토핑: 소고기, 가지볶음, 비타민, 단호박" },
+            { startD: 303, endD: 305, morning: "베이스: 잡곡진밥 / 토핑: 흰살생선, 숙주, 청경채, 당근", lunch: "베이스: 잡곡진밥 / 토핑: 소고기, 아스파라거스, 양송이, 비타민", dinner: "베이스: 잡곡진밥 / 토핑: 두부, 가지, 비트, 애호박" },
+            { startD: 306, endD: 308, morning: "베이스: 잡곡진밥 / 토핑: 소고기, 느타리버섯, 애호박, 파프리카", lunch: "베이스: 잡곡진밥 / 토핑: 닭고기, 가지, 청경채, 당근", dinner: "베이스: 잡곡진밥 / 토핑: 적채, 브로콜리, 새송이, 감자" },
+            { startD: 309, endD: 311, morning: "베이스: 잡곡진밥 / 토핑: 케일,달걀오믈렛, 감자, 당근", lunch: "베이스: 잡곡진밥 / 토핑: 두부, 느타리버섯, 숙주, 비타민", dinner: "베이스: 잡곡진밥 / 토핑: 소고기, 아스파라거스, 브로콜리, 토마토" },
+            { startD: 312, endD: 314, morning: "베이스: 잡곡진밥/ 토핑: 단호박, 건포도범벅, 소고기, 브로콜리", lunch: "베이스: 잡곡진밥 / 토핑: 닭고기, 숙주, 양파, 애호박", dinner: "베이스: 잡곡진밥 / 토핑: 생선, 무, 비타민, 파프리카" },
+            { startD: 315, endD: 317, morning: "베이스: 잡곡진밥 / 토핑: 새우, 애호박조림, 새송이버섯, 적채", lunch: "베이스: 잡곡진밥 / 토핑: 소고기, 단호박, 케일, 비트", dinner: "베이스: 잡곡진밥 / 토핑: 달걀, 아스파라거스, 파프리카, 청경채" },
+            { startD: 318, endD: 320, morning: "베이스: 잡곡진밥 / 토핑: 부추, 달걀스크램블, 애호박, 당근", lunch: "베이스: 잡곡진밥 / 토핑: 소고기, 케일, 무, 감자", dinner: "베이스: 잡곡진밥 / 토핑: 두부, 적채, 토마토, 배추" },
+            { startD: 321, endD: 323, morning: "베이스: 잡곡진밥 / 토핑: 연어, 양파, 감자볼, 애호박, 비트", lunch: "베이스: 잡곡진밥 / 토핑: 단호박, 느타리버섯, 소고기, 비타민", dinner: "베이스: 잡곡진밥 / 토핑: 닭안심소시지, 브로콜리, 양송이버섯" },
+            { startD: 324, endD: 326, morning: "베이스: 잡곡진밥 / 토핑: 소고기라구소스, 브로콜리, 우엉", lunch: "베이스: 잡곡진밥 / 토핑: 단호박, 청경채, 파프리카, 비트", dinner: "베이스: 잡곡진밥 / 토핑: 달걀, 양배추, 브로콜리, 토마토" },
+            { startD: 327, endD: 329, morning: "베이스: 잡곡진밥 / 토핑: 게살, 브로콜리, 당근, 양파", lunch: "베이스: 잡곡진밥 / 토핑: 소고기, 우엉, 청경채, 양배추", dinner: "베이스: 잡곡진밥 / 토핑: 두부, 양송이, 양파, 비트" },
+
+            // 후기 3단계 (D+330~359)
+            { startD: 330, endD: 332, morning: "베이스: 잡곡진밥 / 토핑: 돼지고기수육, 아스파라거스, 양배추, 단호박", lunch: "베이스: 잡곡진밥 / 토핑: 두부, 애호박, 배추, 가지", dinner: "베이스: 잡곡진밥 / 토핑: 소고기, 우엉, 비타민, 당근" },
+            { startD: 333, endD: 335, morning: "베이스: 당근톳밥 / 토핑: 소고기, 양배추, 파프리카", lunch: "베이스: 잡곡진밥 / 토핑: 달걀, 아스파라거스, 브로콜리, 애호박", dinner: "베이스: 잡곡진밥 / 토핑: 팽이버섯, 비타민, 양파, 단호박" },
+            { startD: 336, endD: 338, morning: "베이스: 잡곡진밥 / 토핑: 소고기, 셀러리, 가지, 당근", lunch: "베이스: 잡곡진밥 / 토핑: 비트, 두부, 양파, 토마토", dinner: "베이스: 잡곡진밥 / 토핑: 돼지고기, 시금치, 브로콜리, 파프리카" },
+
+
+
+
+            { startD: 339, endD: 341, morning: "베이스: 잡곡진밥 / 토핑: 오징어볼, 시금치, 단호박, 양파", lunch: "베이스: 잡곡진밥 / 토핑: 소고기, 브로콜리, 가지, 당근", dinner: "베이스: 잡곡진밥 / 토핑: 닭고기, 팽이버섯, 파프리카, 양배추" },
+            { startD: 342, endD: 344, morning: "베이스: 잡곡진밥 / 토핑: 쑷갓, 두부무침, 흰살생선, 무", lunch: "베이스: 잡곡진밥 / 토핑: 소고기, 팽이버섯, 애호박, 토마토", dinner: "베이스: 잡곡진밥 / 토핑: 달걀, 셀러리, 양파, 비트" },
+            { startD: 345, endD: 347, morning: "베이스: 잡곡진밥 / 토핑: 매생이, 달걀찜, 토마토, 애호박", lunch: "베이스: 잡곡진밥 / 토핑: 소고기, 시금치, 비트, 양송이", dinner: "베이스: 잡곡진밥 / 토핑: 두부, 청경채, 무, 브로콜리" },
+            { startD: 348, endD: 350, morning: "베이스: 잡곡진밥 / 토핑: 소고기, 콜라비, 청경채, 파프리카", lunch: "베이스: 잡곡진밥 / 토핑: 두부, 양송이, 양파, 애호박", dinner: "베이스: 잡곡진밥 / 토핑: 게살, 쑥갓, 양배추, 단호박" },
+            { startD: 351, endD: 353, morning: "베이스: 잡곡진밥 / 토핑: 소고기, 오이, 양송이, 연근", lunch: "베이스: 잡곡진밥 / 토핑: 달걀, 콜라비, 애호박, 당근", dinner: "베이스: 잡곡진밥 / 토핑: 흰살생선, 콩나물, 무, 청경채" },
+            { startD: 354, endD: 356, morning: "베이스: 잡곡진밥 / 토핑: 밥새우주먹밥, 연근, 시금치", lunch: "베이스: 잡곡진밥 / 토핑: 소고기, 케일, 콩나물, 당근", dinner: "베이스: 잡곡진밥 / 토핑: 닭고기, 콜라비, 느타리, 단호박" },
+            { startD: 357, endD: 359, morning: "베이스: 강낭콩밥 / 토핑: 달걀, 그린빈, 스크램블에그, 오이, 파프리카", lunch: "베이스: 잡곡진밥 / 토핑: 소고기, 느타리, 당근, 애호박", dinner: "베이스: 잡곡진밥 / 토핑: 새우, 케일, 양파, 단호박" }
+        ];
+
+        let mealDatabase = [];
+        let mealMap = {};
+        let currentViewDate = new Date();
+        let currentWeekStart = new Date();
+
+        window.onload = function() {
+            initDatabase();
+            initBirthDate();
+            setInitialWeek();
+            renderAll();
+
+        };
+
+        /* 커스텀 토스트 알림 기능 구현 */
+        function showToast(message, type = 'success') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = `px-5 py-3 rounded-xl shadow-lg text-white font-semibold text-sm transition-all duration-300 transform translate-y-2 opacity-0 pointer-events-auto`;
+            
+            if (type === 'success') {
+                toast.classList.add('bg-green-500');
+            } else if (type === 'error') {
+                toast.classList.add('bg-red-500');
+            } else {
+                toast.classList.add('bg-orange-400');
+            }
+            
+            toast.innerText = message;
+            container.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.classList.remove('translate-y-2', 'opacity-0');
+            }, 10);
+            
+            setTimeout(() => {
+                toast.classList.add('translate-y-2', 'opacity-0');
+                setTimeout(() => { toast.remove(); }, 300);
+            }, 3000);
+        }
+
+        /* 커스텀 컨펌 대화상자 기능 구현 */
+        let confirmCallback = null;
+        function showConfirm(title, message, callback) {
+            document.getElementById('confirm-title').innerText = title;
+            document.getElementById('confirm-message').innerText = message;
+            
+            const modal = document.getElementById('confirm-modal');
+            modal.classList.remove('hidden');
+            setTimeout(() => {
+                modal.firstElementChild.classList.remove('scale-95');
+                modal.firstElementChild.classList.add('scale-100');
+            }, 10);
+            confirmCallback = callback;
+        }
+
+        document.getElementById('confirm-cancel').onclick = function() {
+            closeConfirm();
+        };
+
+        document.getElementById('confirm-ok').onclick = function() {
+            if (confirmCallback) confirmCallback();
+            closeConfirm();
+        };
+
+        function closeConfirm() {
+            const modal = document.getElementById('confirm-modal');
+            modal.firstElementChild.classList.remove('scale-100');
+            modal.firstElementChild.classList.add('scale-95');
+            setTimeout(() => {
+                modal.classList.add('hidden');
+            }, 150);
+            confirmCallback = null;
+        }
+
+        function initBirthDate() {
+            const saved = localStorage.getItem('dain_birth_date');
+            if (saved) BIRTH_DATE = new Date(saved);
+            document.getElementById('birth-date-setter').valueAsDate = new Date(BIRTH_DATE.getTime() - BIRTH_DATE.getTimezoneOffset() * 60000);
+        }
+
+        function updateBirthDate(val) {
+            if (!val) return;
+            BIRTH_DATE = new Date(val);
+            localStorage.setItem('dain_birth_date', val);
+            updateMealMap();
+            renderAll();
+            showToast('기준일(생일)이 업데이트되었습니다!');
+        }
+
+        /* [핵심 버그 수정] 기존 v3 로컬스토리지가 존재하더라도, 누락된 D+300 이후 데이터만 추출해 자동 병합 */
+        function initDatabase() {
+            let saved = localStorage.getItem('dain_meal_db_v3');
+            let isUpgraded = false;
+
+            if (!saved) {
+                saved = localStorage.getItem('dain_meal_db_v4');
+            } else {
+                isUpgraded = true; // 구형 키 발견 시 마이그레이션 모드 작동
+            }
+
+            if (saved) {
+                mealDatabase = JSON.parse(saved);
+                
+                // 똑똑한 병합 로직: pdfData에는 있으나 현재 local DB에 범위가 전혀 포함되지 않는 구간 추가
+                pdfData.forEach(pRange => {
+                    const exists = mealDatabase.some(mRange => 
+                        (pRange.startD >= mRange.startD && pRange.startD <= mRange.endD) ||
+                        (pRange.endD >= mRange.startD && pRange.endD <= mRange.endD)
+                    );
+                    if (!exists) {
+                        mealDatabase.push(pRange);
+                    }
+                });
+                
+                // 날짜 오름차순 정렬
+                mealDatabase.sort((a, b) => a.startD - b.startD);
+                
+                // 새로운 v4 저장공간으로 업데이트 후 구형 v3 자원 삭제
+                localStorage.setItem('dain_meal_db_v4', JSON.stringify(mealDatabase));
+                if (isUpgraded) {
+                    localStorage.removeItem('dain_meal_db_v3');
+                }
+            } else {
+                mealDatabase = [...pdfData];
+                saveToLocalStorage();
+            }
+            updateMealMap();
+        }
+
+        function updateMealMap() {
+            mealMap = {};
+            mealDatabase.forEach(range => {
+                for (let d = range.startD; d <= range.endD; d++) {
+                    mealMap[d] = { morning: range.morning, lunch: range.lunch, dinner: range.dinner, snack: range.snack || "" };
+                }
+            });
+        }
+
+        function saveToLocalStorage() {
+            localStorage.setItem('dain_meal_db_v4', JSON.stringify(mealDatabase));
+            updateMealMap();
+        }
+
+        /* 전체 초기 리셋 기능 */
+        function resetDbToDefault() {
+            showConfirm('데이터 초기화', '저장된 모든 변경 사항이 사라지고 오리지널 식단 템플릿(D+270 ~ D+359)으로 복구됩니다. 진행하시겠습니까?', function() {
+                mealDatabase = [...pdfData];
+                saveToLocalStorage();
+                renderAll();
+                showToast('초기 데이터로 완전히 리셋되었습니다.', 'success');
+            });
+        }
+
+        /* [날짜 정확도 보완] 타임존에 무관하게 정밀한 일수차이 반환 (Math.round 사용) */
+        function getDDay(date) {
+            const d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+            const b = new Date(BIRTH_DATE.getFullYear(), BIRTH_DATE.getMonth(), BIRTH_DATE.getDate());
+            const diffTime = d.getTime() - b.getTime();
+            return Math.round(diffTime / (1000 * 60 * 60 * 24));
+        }
+
+        function renderAll() {
+            renderMenuTab();
+            renderPrepTab();
+            renderDBTab();
+            loadMemos();
+            loadShoppingList();
+        }
+
+        function showTab(tab) {
+            const tabs = ['menu', 'search', 'prep', 'db'];
+            tabs.forEach(t => {
+                document.getElementById(`tab-content-${t}`).classList.add('hidden');
+                document.getElementById(`btn-${t}`).className = "flex-1 py-4 text-center text-gray-400 font-semibold";
+            });
+            document.getElementById(`tab-content-${tab}`).classList.remove('hidden');
+            document.getElementById(`btn-${tab}`).className = "flex-1 py-4 text-center tab-active font-semibold";
+            if(tab === 'menu') renderMenuTab();
+            if(tab === 'prep') renderPrepTab();
+            if(tab === 'db') renderDBTab();
+        }
+
+        // --- 메뉴 탭 ---
+        function renderMenuTab() {
+            const selector = document.getElementById('date-selector');
+            selector.valueAsDate = new Date(currentViewDate.getTime() - currentViewDate.getTimezoneOffset() * 60000);
+            const dDay = getDDay(currentViewDate);
+            document.getElementById('d-day-info').innerText = `D+${dDay} | ${currentViewDate.toLocaleDateString()}`;
+            const list = document.getElementById('meals-list');
+            list.innerHTML = "";
+            const dayMeal = mealMap[dDay];
+            if (!dayMeal) {
+                list.innerHTML = `<div class="text-center py-10 text-gray-300 italic">D+${dDay} 일에 기록된 식단이 없습니다. (D+270~359일 제공)</div>`;
+                return;
+            }
+            const sessions = [
+                { name: '아침 ☀️', content: dayMeal.morning, icon: 'bg-orange-50 border-orange-300 text-orange-600' },
+                { name: '점심 ☁️', content: dayMeal.lunch, icon: 'bg-blue-50 border-blue-200 text-blue-600' },
+                { name: '저녁 🌙', content: dayMeal.dinner, icon: 'bg-indigo-50 border-indigo-200 text-indigo-600' }
+            ];
+            sessions.forEach(s => {
+                if (!s.content) return;
+                const card = document.createElement('div');
+                card.className = `${s.icon} border-l-4 p-4 rounded-r-2xl shadow-sm mb-4`;
+                card.innerHTML = `<h4 class="font-bold mb-2 text-xs opacity-70">${s.name}</h4>`;
+                const tags = s.content.split(/[,/]/);
+                const tagsDiv = document.createElement('div');
+                tagsDiv.className = "flex flex-wrap gap-1";
+                tags.forEach(t => {
+                    const clean = t.replace(/베이스:|토핑:/g, "").trim();
+                    if(!clean) return;
+                    const span = document.createElement('span');
+                    span.className = `ingredient-tag ${getColorClass(clean)}`;
+                    span.innerText = clean;
+                    tagsDiv.appendChild(span);
+                });
+                card.appendChild(tagsDiv);
+                list.appendChild(card);
+            });
+        }
+
+        /* 식재료 분류 조건 및 적용 가능성 확장 */
+        function getColorClass(text) {
+            if (text.includes('소고기') || text.includes('한우')) return 'tag-beef';
+            if (text.includes('닭고기') || text.includes('닭다리') || text.includes('닭안심')) return 'tag-chicken';
+            if (text.includes('생선') || text.includes('대구') || text.includes('새우') || text.includes('톳') || text.includes('밥새우') || text.includes('게살')) return 'tag-fish';
+            if (text.includes('돼지고기')) return 'tag-pork';
+            if (text.includes('시금치') || text.includes('브로콜리') || text.includes('청경채') || text.includes('그린빈') || text.includes('아스파라거스') || text.includes('미역') || text.includes('아욱') || text.includes('비타민') || text.includes('근대')) return 'tag-veg-green';
+            if (text.includes('당근') || text.includes('토마토') || text.includes('파프리카') || text.includes('비트') || text.includes('가지') || text.includes('적채')) return 'tag-veg-red';
+            if (text.includes('단호박')) return 'tag-pumpkin';
+            if (text.includes('달걀') || text.includes('계란')) return 'tag-egg';
+            if (text.includes('진밥') || text.includes('무른밥') || text.includes('죽') || text.includes('오트밀') || text.includes('밥')) return 'tag-base';
+            return 'tag-default';
+        }
+
+        function moveDate(n) { currentViewDate.setDate(currentViewDate.getDate() + n); renderMenuTab(); }
+        function goToToday() { currentViewDate = new Date(); renderMenuTab(); }
+
+        // --- 검색 탭 ---
+        function getAllIngredients() {
+            const all = new Set();
+            mealDatabase.forEach(r => {
+                [r.morning, r.lunch, r.dinner].forEach(s => {
+                    s.split(/[,/]/).forEach(t => {
+                        const clean = t.replace(/베이스:|토핑:|아침:|점심:|저녁:|간식:|1\.|2\./g, "").trim();
+                        if (clean && clean.length > 0) all.add(clean);
+                    });
+                });
+            });
+            return Array.from(all);
+        }
+
+        function handleSearchInput(val) {
+            const suggestions = document.getElementById('search-suggestions');
+            if (!val.trim()) { suggestions.classList.add('hidden'); return; }
+            const ingredients = getAllIngredients();
+            const filtered = ingredients.filter(i => i.includes(val));
+            if (filtered.length > 0) {
+                suggestions.innerHTML = filtered.map(f => `<div class="p-3 border-b hover:bg-orange-50 cursor-pointer text-sm font-medium" onclick="executeSearch('${f}')">${f}</div>`).join('');
+                suggestions.classList.remove('hidden');
+            } else {
+                suggestions.classList.add('hidden');
+            }
+        }
+
+        function executeSearch(keyword) {
+            document.getElementById('search-input').value = keyword;
+            document.getElementById('search-suggestions').classList.add('hidden');
+            const resultsDiv = document.getElementById('search-results');
+            resultsDiv.innerHTML = "";
+            let found = false;
+            mealDatabase.forEach(range => {
+                for (let d = range.startD; d <= range.endD; d++) {
+                    const meals = mealMap[d];
+                    if (!meals) continue;
+                    ['morning', 'lunch', 'dinner'].forEach(time => {
+                        if (meals[time] && meals[time].includes(keyword)) {
+                            found = true;
+                            const date = new Date(BIRTH_DATE);
+                            date.setDate(date.getDate() + d);
+                            const item = document.createElement('div');
+                            item.className = "p-4 bg-white border border-orange-100 rounded-2xl shadow-sm flex justify-between items-center hover:border-orange-200 transition-colors";
+                            item.innerHTML = `
+                                <div>
+                                    <div class="text-xs text-orange-400 font-bold">D+${d}</div>
+                                    <div class="font-bold text-gray-700">${date.toLocaleDateString()}</div>
+                                    <div class="text-xs text-gray-400 mt-0.5">${time === 'morning' ? '아침 식단' : time === 'lunch' ? '점심 식단' : '저녁 식단'}</div>
+                                </div>
+                                <button onclick="viewSpecificDate(${d})" class="bg-orange-100 hover:bg-orange-200 text-orange-600 px-3 py-1.5 rounded-full text-xs font-bold active:scale-95 transition-transform">이동</button>
+                            `;
+                            resultsDiv.appendChild(item);
+                        }
+                    });
+                }
+            });
+            if (!found) resultsDiv.innerHTML = `<p class="text-center py-10 text-gray-400">검색 결과가 없습니다.</p>`;
+        }
+
+        function viewSpecificDate(d) {
+            const date = new Date(BIRTH_DATE);
+            date.setDate(date.getDate() + d);
+            currentViewDate = date;
+            showTab('menu');
+        }
+
+        // --- 준비 탭 ---
+        function setInitialWeek() {
+            const d = new Date();
+            const day = d.getDay();
+            const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+            currentWeekStart = new Date(d.setDate(diff));
+            currentWeekStart.setHours(0,0,0,0);
+        }
+
+        function renderPrepTab() {
+            const end = new Date(currentWeekStart); end.setDate(end.getDate() + 6);
+            document.getElementById('week-range').innerText = `${currentWeekStart.getMonth()+1}.${currentWeekStart.getDate()} ~ ${end.getMonth()+1}.${end.getDate()}`;
+            const ings = new Set();
+            for (let i = 0; i < 7; i++) {
+                const d = new Date(currentWeekStart); d.setDate(d.getDate() + i);
+                const meal = mealMap[getDDay(d)];
+                if (meal) {
+                    [meal.morning, meal.lunch, meal.dinner].forEach(m => {
+                        m.split(/[,/]/).forEach(it => {
+                            const clean = it.replace(/베이스:|토핑:/g, "").trim();
+                            if(clean && clean.length >= 1 && !clean.includes('밥') && !clean.includes('죽')) ings.add(clean);
+                        });
+                    });
+                }
+            }
+            const container = document.getElementById('available-ingredients');
+            container.innerHTML = "";
+            ings.forEach(ing => {
+                const btn = document.createElement('button');
+                btn.className = "px-3 py-1.5 bg-gray-100 rounded-full text-xs text-gray-600 active:bg-orange-100 font-semibold shadow-sm hover:bg-gray-200 transition-colors";
+                btn.innerText = ing;
+                btn.onclick = () => addToShoppingList(ing);
+                container.appendChild(btn);
+            });
+            if (ings.size === 0) {
+                container.innerHTML = `<p class="text-xs text-gray-300 italic py-2">이번 주 범위에 등록된 가용 식재료가 없습니다.</p>`;
+            }
+        }
+
+        function moveWeek(n) { currentWeekStart.setDate(currentWeekStart.getDate() + n*7); renderPrepTab(); }
+        function goToCurrentWeek() { setInitialWeek(); renderPrepTab(); }
+
+        // --- 메모/장바구니 ---
+        function addMemoRow() {
+            const area = document.getElementById('memo-input-area');
+            const row = document.createElement('div');
+            row.className = "flex gap-2 items-center";
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.placeholder = '메모를 입력하고 엔터 또는 ✓ 를 누르세요';
+            input.className = "flex-1 border-2 border-orange-100 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-orange-300 transition-colors";
+            const saveBtn = document.createElement('button');
+            saveBtn.textContent = '✓';
+            saveBtn.className = "w-9 h-9 bg-green-400 hover:bg-green-500 text-white rounded-full font-bold text-base flex-shrink-0 active:scale-90 transition-transform shadow";
+            const doSave = () => {
+                const val = input.value.trim();
+                if (!val) { row.remove(); return; }
+                const memos = JSON.parse(localStorage.getItem('dain_memos') || "[]");
+                memos.push(val);
+                localStorage.setItem('dain_memos', JSON.stringify(memos));
+                row.remove();
+                loadMemos();
+                showToast('메모가 저장되었습니다.', 'info');
+            };
+            saveBtn.onclick = doSave;
+            input.addEventListener('keypress', e => { if (e.key === 'Enter') doSave(); });
+            row.appendChild(input);
+            row.appendChild(saveBtn);
+            area.appendChild(row);
+            input.focus();
+        }
+        function loadMemos() {
+            const list = document.getElementById('memo-list');
+            list.innerHTML = "";
+            const memos = JSON.parse(localStorage.getItem('dain_memos') || "[]");
+            memos.forEach((m, i) => {
+                const li = document.createElement('li');
+                li.className = "flex justify-between items-center bg-white border p-3 rounded-xl shadow-sm text-sm";
+                li.innerHTML = `<span class="font-medium text-gray-700">• ${m}</span><button onclick="deleteMemo(${i})" class="text-red-400 p-1 active:scale-90 transition-transform">✕</button>`;
+                list.appendChild(li);
+            });
+        }
+        function deleteMemo(i) {
+            const memos = JSON.parse(localStorage.getItem('dain_memos') || "[]");
+            memos.splice(i, 1);
+            localStorage.setItem('dain_memos', JSON.stringify(memos));
+            loadMemos();
+            showToast('메모를 제거했습니다.', 'info');
+        }
+        function addToShoppingList(item) {
+            const list = JSON.parse(localStorage.getItem('dain_shopping') || "[]");
+            if (!list.includes(item)) {
+                list.push(item);
+                localStorage.setItem('dain_shopping', JSON.stringify(list));
+                loadShoppingList();
+                showToast(`🛒 ${item} 장바구니 추가!`);
+            } else {
+                showToast('이미 장바구니에 존재합니다.', 'info');
+            }
+        }
+        function loadShoppingList() {
+            const cont = document.getElementById('shopping-list');
+            cont.innerHTML = "";
+            const list = JSON.parse(localStorage.getItem('dain_shopping') || "[]");
+            list.forEach((item, i) => {
+                const div = document.createElement('div');
+                div.className = "flex justify-between items-center bg-white p-3 rounded-xl text-sm border-l-4 border-blue-300 shadow-sm";
+                div.innerHTML = `<span class="font-semibold text-gray-700">${item}</span><button onclick="removeFromShopping(${i})" class="text-gray-400 p-1 active:scale-90 transition-transform">✕</button>`;
+                cont.appendChild(div);
+            });
+            if (list.length === 0) {
+                cont.innerHTML = `<p class="text-xs text-gray-400 text-center py-4">바구니가 비어 있습니다.</p>`;
+            }
+        }
+        function removeFromShopping(i) {
+            const list = JSON.parse(localStorage.getItem('dain_shopping') || "[]");
+            list.splice(i, 1);
+            localStorage.setItem('dain_shopping', JSON.stringify(list));
+            loadShoppingList();
+            showToast('장바구니에서 삭제 완료');
+        }
+
+        // --- 관리(DB) ---
+        function renderDBTab() {
+            const cont = document.getElementById('db-editor-container');
+            cont.innerHTML = "";
+            mealDatabase.forEach((range, idx) => {
+                const div = document.createElement('div');
+                div.className = "mb-6 p-4 border rounded-2xl bg-white shadow-sm hover:shadow-md transition-shadow";
+                div.innerHTML = `
+                    <div class="flex justify-between items-center mb-3">
+                        <span class="font-bold text-orange-500 text-sm">🗓️ D+${range.startD} ~ D+${range.endD}</span>
+                        <button onclick="deleteDbRange(${idx})" class="text-red-400 text-xs font-bold bg-red-50 hover:bg-red-100 px-2 py-1 rounded-md transition-colors">삭제</button>
+                    </div>
+                    <div class="space-y-2">
+                        <div class="flex items-center gap-2">
+                            <span class="text-xs font-bold text-gray-400 w-8">아침</span>
+                            <input type="text" value="${range.morning}" onchange="updateDbValue(${idx}, 'morning', this.value)" class="flex-1 text-xs p-2 border rounded focus:border-orange-300 focus:outline-none transition-colors" placeholder="아침 식단">
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="text-xs font-bold text-gray-400 w-8">점심</span>
+                            <input type="text" value="${range.lunch}" onchange="updateDbValue(${idx}, 'lunch', this.value)" class="flex-1 text-xs p-2 border rounded focus:border-orange-300 focus:outline-none transition-colors" placeholder="점심 식단">
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="text-xs font-bold text-gray-400 w-8">저녁</span>
+                            <input type="text" value="${range.dinner}" onchange="updateDbValue(${idx}, 'dinner', this.value)" class="flex-1 text-xs p-2 border rounded focus:border-orange-300 focus:outline-none transition-colors" placeholder="저녁 식단">
+                        </div>
+                    </div>
+                `;
+                cont.appendChild(div);
+            });
+        }
+        function updateDbValue(idx, key, val) { mealDatabase[idx][key] = val; }
+        function saveAllToDB() { 
+            saveToLocalStorage(); 
+            showToast('전체 저장 완료! 변경사항이 반영되었습니다.', 'success'); 
+            renderAll(); 
+        }
+        function deleteDbRange(idx) { 
+            showConfirm('범위 삭제', '해당 일수 범위의 식단을 정말로 완전히 삭제하시겠습니까?', function() {
+                mealDatabase.splice(idx, 1); 
+                saveToLocalStorage();
+                renderAll(); 
+                showToast('범위가 성공적으로 삭제되었습니다.');
+            });
+        }
+    </script>
+</body>
+</html>
